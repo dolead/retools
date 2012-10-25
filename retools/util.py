@@ -6,8 +6,8 @@ def func_namespace(func, deco_args):
     """Generates a unique namespace for a function"""
     kls = None
     if hasattr(func, 'im_func'):
-        kls = func.im_class
-        func = func.im_func
+        kls = func.__self__.__class__
+        func = func.__func__
 
     deco_key = " ".join(map(str, deco_args))
     if kls:

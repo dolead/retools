@@ -1,7 +1,7 @@
 # coding: utf-8
 import unittest
 import time
-import cPickle
+import pickle
 from contextlib import nested
 
 import redis
@@ -179,7 +179,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.side_effect = side_effect
         mock_redis.hgetall.return_value = {'created': now,
-              'value': cPickle.dumps("This is a NEW value")}
+              'value': pickle.dumps("This is a NEW value")}
         with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
@@ -198,7 +198,7 @@ class TestCacheRegion(unittest.TestCase):
         now = time.time()
         mock_redis.pipeline.return_value = mock_pipeline
         mock_pipeline.execute.return_value = ({'created': now,
-              'value': cPickle.dumps("This is a value")}, '0')
+              'value': pickle.dumps("This is a value")}, '0')
         with patch('retools.global_connection._redis', mock_redis):
             CR = self._makeOne()
             CR.add_region('short_term', 60)
@@ -220,7 +220,7 @@ class TestCacheRegion(unittest.TestCase):
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         now = time.time()
         results = [0, ({'created': now - 200,
-                        'value': cPickle.dumps("This is a value")},
+                        'value': pickle.dumps("This is a value")},
                    '0')]
 
         def side_effect(*args):
@@ -360,7 +360,7 @@ class TestInvalidateRegion(unittest.TestCase):
 
     def test_invalidate_small_region(self):
         mock_redis = Mock(spec=redis.client.Redis)
-        results = [set(['keyspace']), set(['a_func'])]
+        results = [{'keyspace'}, {'a_func'}]
 
         def side_effect(*args):
             return results.pop()
@@ -379,7 +379,7 @@ class TestInvalidateRegion(unittest.TestCase):
 
     def test_remove_nonexistent_key(self):
         mock_redis = Mock(spec=redis.client.Redis)
-        results = [set(['keyspace']), set(['a_func'])]
+        results = [{'keyspace'}, {'a_func'}]
 
         def side_effect(*args):
             return results.pop()
@@ -416,7 +416,7 @@ class TestInvalidFunction(unittest.TestCase):
         my_func._namespace = 'retools:a_key'
 
         mock_redis = Mock(spec=redis.client.Redis)
-        mock_redis.smembers.return_value = set(['1'])
+        mock_redis.smembers.return_value = {'1'}
 
         mock_pipeline = Mock(spec=redis.client.Pipeline)
         mock_redis.pipeline.return_value = mock_pipeline
@@ -439,7 +439,7 @@ class TestInvalidFunction(unittest.TestCase):
         my_func._namespace = 'retools:a_key decarg'
 
         mock_redis = Mock(spec=redis.client.Redis)
-        mock_redis.smembers.return_value = set(['1'])
+        mock_redis.smembers.return_value = {'1'}
 
         invalidate_function = self._makeOne()
         with patch('retools.global_connection._redis', mock_redis):
@@ -455,11 +455,11 @@ class TestInvalidFunction(unittest.TestCase):
             # And a unicode key
             mock_redis.reset_mock()
             invalidate_function(my_func,
-                  u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
+                  "\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac")
             calls = mock_redis.method_calls
             eq_(calls[0][1][0],
-                  u'retools:short_term:retools:a_key' \
-                  u' decarg:\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
+                  'retools:short_term:retools:a_key' \
+                  ' decarg:\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac')
             eq_(calls[0][0], 'hset')
             eq_(len(calls), 1)
 
@@ -535,68 +535,68 @@ class TestCacheDecorator(unittest.TestCase):
     def test_unicode_keys(self):
         keys = [
             # arabic (egyptian)
-            u"\u0644\u064a\u0647\u0645\u0627\u0628\u062a\u0643\u0644\u0645" \
-            u"\u0648\u0634\u0639\u0631\u0628\u064a\u061f",
+            "\u0644\u064a\u0647\u0645\u0627\u0628\u062a\u0643\u0644\u0645" \
+            "\u0648\u0634\u0639\u0631\u0628\u064a\u061f",
             # Chinese (simplified)
-            u"\u4ed6\u4eec\u4e3a\u4ec0\u4e48\u4e0d\u8bf4\u4e2d\u6587",
+            "\u4ed6\u4eec\u4e3a\u4ec0\u4e48\u4e0d\u8bf4\u4e2d\u6587",
             # Chinese (traditional)
-            u"\u4ed6\u5011\u7232\u4ec0\u9ebd\u4e0d\u8aaa\u4e2d\u6587",
+            "\u4ed6\u5011\u7232\u4ec0\u9ebd\u4e0d\u8aaa\u4e2d\u6587",
             # czech
-            u"\u0050\u0072\u006f\u010d\u0070\u0072\u006f\u0073\u0074\u011b" \
-            u"\u006e\u0065\u006d\u006c\u0075\u0076\u00ed\u010d\u0065\u0073" \
-            u"\u006b\u0079",
+            "\u0050\u0072\u006f\u010d\u0070\u0072\u006f\u0073\u0074\u011b" \
+            "\u006e\u0065\u006d\u006c\u0075\u0076\u00ed\u010d\u0065\u0073" \
+            "\u006b\u0079",
             # hebrew
-            u"\u05dc\u05de\u05d4\u05d4\u05dd\u05e4\u05e9\u05d5\u05d8\u05dc" \
-            u"\u05d0\u05de\u05d3\u05d1\u05e8\u05d9\u05dd\u05e2\u05d1\u05e8" \
-            u"\u05d9\u05ea",
+            "\u05dc\u05de\u05d4\u05d4\u05dd\u05e4\u05e9\u05d5\u05d8\u05dc" \
+            "\u05d0\u05de\u05d3\u05d1\u05e8\u05d9\u05dd\u05e2\u05d1\u05e8" \
+            "\u05d9\u05ea",
             # Hindi (Devanagari)
-            u"\u092f\u0939\u0932\u094b\u0917\u0939\u093f\u0928\u094d\u0926" \
-            u"\u0940\u0915\u094d\u092f\u094b\u0902\u0928\u0939\u0940\u0902" \
-            u"\u092c\u094b\u0932\u0938\u0915\u0924\u0947\u0939\u0948\u0902",
+            "\u092f\u0939\u0932\u094b\u0917\u0939\u093f\u0928\u094d\u0926" \
+            "\u0940\u0915\u094d\u092f\u094b\u0902\u0928\u0939\u0940\u0902" \
+            "\u092c\u094b\u0932\u0938\u0915\u0924\u0947\u0939\u0948\u0902",
             # Japanese (kanji and hiragana)
-            u"\u306a\u305c\u307f\u3093\u306a\u65e5\u672c\u8a9e\u3092\u8a71" \
-            u"\u3057\u3066\u304f\u308c\u306a\u3044\u306e\u304b",
+            "\u306a\u305c\u307f\u3093\u306a\u65e5\u672c\u8a9e\u3092\u8a71" \
+            "\u3057\u3066\u304f\u308c\u306a\u3044\u306e\u304b",
             # Russian (Cyrillic)
-            u"\u043f\u043e\u0447\u0435\u043c\u0443\u0436\u0435\u043e\u043d" \
-            u"\u0438\u043d\u0435\u0433\u043e\u0432\u043e\u0440\u044f\u0442" \
-            u"\u043f\u043e\u0440\u0443\u0441\u0441\u043a\u0438",
+            "\u043f\u043e\u0447\u0435\u043c\u0443\u0436\u0435\u043e\u043d" \
+            "\u0438\u043d\u0435\u0433\u043e\u0432\u043e\u0440\u044f\u0442" \
+            "\u043f\u043e\u0440\u0443\u0441\u0441\u043a\u0438",
             # Spanish
-            u"\u0050\u006f\u0072\u0071\u0075\u00e9\u006e\u006f\u0070\u0075" \
-            u"\u0065\u0064\u0065\u006e\u0073\u0069\u006d\u0070\u006c\u0065" \
-            u"\u006d\u0065\u006e\u0074\u0065\u0068\u0061\u0062\u006c\u0061" \
-            u"\u0072\u0065\u006e\u0045\u0073\u0070\u0061\u00f1\u006f\u006c",
+            "\u0050\u006f\u0072\u0071\u0075\u00e9\u006e\u006f\u0070\u0075" \
+            "\u0065\u0064\u0065\u006e\u0073\u0069\u006d\u0070\u006c\u0065" \
+            "\u006d\u0065\u006e\u0074\u0065\u0068\u0061\u0062\u006c\u0061" \
+            "\u0072\u0065\u006e\u0045\u0073\u0070\u0061\u00f1\u006f\u006c",
             # Vietnamese
-            u"\u0054\u1ea1\u0069\u0073\u0061\u006f\u0068\u1ecd\u006b\u0068" \
-            u"\u00f4\u006e\u0067\u0074\u0068\u1ec3\u0063\u0068\u1ec9\u006e" \
-            u"\u00f3\u0069\u0074\u0069\u1ebf\u006e\u0067\u0056\u0069\u1ec7" \
-            u"\u0074",
+            "\u0054\u1ea1\u0069\u0073\u0061\u006f\u0068\u1ecd\u006b\u0068" \
+            "\u00f4\u006e\u0067\u0074\u0068\u1ec3\u0063\u0068\u1ec9\u006e" \
+            "\u00f3\u0069\u0074\u0069\u1ebf\u006e\u0067\u0056\u0069\u1ec7" \
+            "\u0074",
             # Japanese
-            u"\u0033\u5e74\u0042\u7d44\u91d1\u516b\u5148\u751f",
+            "\u0033\u5e74\u0042\u7d44\u91d1\u516b\u5148\u751f",
             # Japanese
-            u"\u5b89\u5ba4\u5948\u7f8e\u6075\u002d\u0077\u0069\u0074\u0068" \
-            u"\u002d\u0053\u0055\u0050\u0045\u0052\u002d\u004d\u004f\u004e" \
-            u"\u004b\u0045\u0059\u0053",
+            "\u5b89\u5ba4\u5948\u7f8e\u6075\u002d\u0077\u0069\u0074\u0068" \
+            "\u002d\u0053\u0055\u0050\u0045\u0052\u002d\u004d\u004f\u004e" \
+            "\u004b\u0045\u0059\u0053",
             # Japanese
-            u"\u0048\u0065\u006c\u006c\u006f\u002d\u0041\u006e\u006f\u0074" \
-            u"\u0068\u0065\u0072\u002d\u0057\u0061\u0079\u002d\u305d\u308c" \
-            u"\u305e\u308c\u306e\u5834\u6240",
+            "\u0048\u0065\u006c\u006c\u006f\u002d\u0041\u006e\u006f\u0074" \
+            "\u0068\u0065\u0072\u002d\u0057\u0061\u0079\u002d\u305d\u308c" \
+            "\u305e\u308c\u306e\u5834\u6240",
             # Japanese
-            u"\u3072\u3068\u3064\u5c4b\u6839\u306e\u4e0b\u0032",
+            "\u3072\u3068\u3064\u5c4b\u6839\u306e\u4e0b\u0032",
             # Japanese
-            u"\u004d\u0061\u006a\u0069\u3067\u004b\u006f\u0069\u3059\u308b" \
-            u"\u0035\u79d2\u524d",
+            "\u004d\u0061\u006a\u0069\u3067\u004b\u006f\u0069\u3059\u308b" \
+            "\u0035\u79d2\u524d",
             # Japanese
-            u"\u30d1\u30d5\u30a3\u30fc\u0064\u0065\u30eb\u30f3\u30d0",
+            "\u30d1\u30d5\u30a3\u30fc\u0064\u0065\u30eb\u30f3\u30d0",
             # Japanese
-            u"\u305d\u306e\u30b9\u30d4\u30fc\u30c9\u3067",
+            "\u305d\u306e\u30b9\u30d4\u30fc\u30c9\u3067",
             # greek
-            u"\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac",
+            "\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac",
             # Maltese (Malti)
-            u"\u0062\u006f\u006e\u0121\u0075\u0073\u0061\u0127\u0127\u0061",
+            "\u0062\u006f\u006e\u0121\u0075\u0073\u0061\u0127\u0127\u0061",
             # Russian (Cyrillic)
-            u"\u043f\u043e\u0447\u0435\u043c\u0443\u0436\u0435\u043e\u043d" \
-            u"\u0438\u043d\u0435\u0433\u043e\u0432\u043e\u0440\u044f\u0442" \
-            u"\u043f\u043e\u0440\u0443\u0441\u0441\u043a\u0438"
+            "\u043f\u043e\u0447\u0435\u043c\u0443\u0436\u0435\u043e\u043d" \
+            "\u0438\u043d\u0435\u0433\u043e\u0432\u043e\u0440\u044f\u0442" \
+            "\u043f\u043e\u0440\u0443\u0441\u0441\u043a\u0438"
         ]
         mock_redis = Mock(spec=redis.client.Redis)
         mock_pipeline = Mock(spec=redis.client.Pipeline)
