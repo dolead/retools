@@ -211,14 +211,14 @@ class CacheRegion(object):
             result = redis.hgetall(keys.redis_key)
 
         expired = True
-        if result and now - float(result['created']) < expires:
+        if result and now - float(result[b'created']) < expires:
             expired = False
 
         if (result and not regenerate) or not expired:
             # We have a result and were told not to regenerate so
             # we always return it immediately regardless of expiration,
             # or its not expired
-            return pickle.loads(result['value'])
+            return pickle.loads(result[b'value'])
 
         if not result and not regenerate:
             # No existing value, but we were told not to regenerate it and
@@ -237,8 +237,8 @@ class CacheRegion(object):
                 result = redis.hgetall(keys.redis_key)
                 now = time.time()
                 if result and 'value' in result and \
-                   now - float(result['created']) < expires:
-                    return pickle.loads(result['value'])
+                   now - float(result[b'created']) < expires:
+                    return pickle.loads(result[b'value'])
 
                 value = callable()
 
@@ -254,7 +254,7 @@ class CacheRegion(object):
                     p.execute()
         except LockTimeout:
             if result:
-                return pickle.loads(result['value'])
+                return pickle.loads(result[b'value'])
             else:
                 # log some sort of error?
                 return NoneMarker
