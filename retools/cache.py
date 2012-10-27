@@ -211,7 +211,7 @@ class CacheRegion(object):
             result = redis.hgetall(keys.redis_key)
 
         expired = True
-        if result and now - float(result[b'created']) < expires:
+        if expires is None or (result and now - float(result[b'created']) < expires):
             expired = False
 
         if (result and not regenerate) or not expired:
