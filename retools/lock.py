@@ -49,6 +49,9 @@ class Lock(object):
     def __enter__(self):
         redis = self.redis
         timeout = self.timeout
+
+        if self.expires is None:
+            return
         while timeout >= 0:
             expires = time.time() + self.expires + 1
 
@@ -75,6 +78,8 @@ class Lock(object):
     def __exit__(self, exc_type, exc_value, traceback):
         # Only delete the key if we completed within the lock expiration,
         # otherwise, another lock might've been established
+        if self.expires is None:
+            return
         if time.time() - self.start_time < self.expires:
             self.redis.delete(self.key)
 

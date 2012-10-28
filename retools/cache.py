@@ -218,7 +218,12 @@ class CacheRegion(object):
             # We have a result and were told not to regenerate so
             # we always return it immediately regardless of expiration,
             # or its not expired
-            return pickle.loads(result[b'value'])
+            try:
+                result = pickle.loads(result[b'value'])
+            except KeyError:
+                pass
+            else:
+                return result
 
         if not result and not regenerate:
             # No existing value, but we were told not to regenerate it and
