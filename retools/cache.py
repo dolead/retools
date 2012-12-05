@@ -134,25 +134,32 @@ class CacheRegion(object):
 
         """
         redis = global_connection.redis
-        namespaces = redis.smembers('retools:%s:namespaces' % region)
+        namespaces = {ns.decode('utf8') for ns in redis.smembers('retools:%s:namespaces' % region)}
         if not namespaces:
             return None
 
         # Locate the longest expiration of a region, so we can set
         # the created value far enough back to force a refresh
-        longest_expire = max(
-              [x['expires'] for x in list(CacheRegion.regions.values())])
-        new_created = time.time() - longest_expire - 3600
+        try:
+            longest_expire = max(
+                  [x['expires'] for x in list(CacheRegion.regions.values())])
+            new_created = time.time() - longest_expire - 3600
+        except TypeError:
+            new_created = False
 
         for ns in namespaces:
             cache_keyset_key = 'retools:%s:%s:keys' % (region, ns)
-            keys = {''} | redis.smembers(cache_keyset_key)
+            keys = {''} | {_k.decode('utf8') for _k in redis.smembers(cache_keyset_key)}
             for key in keys:
                 cache_key = 'retools:%s:%s:%s' % (region, ns, key)
                 if not redis.exists(cache_key):
                     redis.srem(cache_keyset_key, key)
                 else:
-                    redis.hset(cache_key, 'created', new_created)
+                    if new_created is not False:
+                        redis.hset(cache_key, 'created', new_created)
+                    else:
+                        redis.delete(cache_key)
+            
 
     @classmethod
     def load(cls, region, namespace, key, regenerate=True, callable=None,
@@ -250,6 +257,7 @@ class CacheRegion(object):
                 p = redis.pipeline(transaction=True)
                 p.hmset(keys.redis_key, {'created': now,
                                     'value': pickle.dumps(value)})
+
                 p.expire(keys.redis_key, redis_expiration)
                 cls._add_tracking(p, region, namespace, key)
                 if statistics:
@@ -293,7 +301,6 @@ def invalidate_region(region):
     """
     CacheRegion.invalidate(region)
 
-
 def invalidate_callable(callable, *args):
     """Invalidate the cache for a callable
 
@@ -329,22 +336,34 @@ def invalidate_callable(callable, *args):
     namespace = callable._namespace
 
     # Get the expiration for this region
-    new_created = time.time() - CacheRegion.regions[region]['expires'] - 3600
+    if CacheRegion.regions[region]['expires'] is None:
+        new_created = False
+    else:
+        new_created = time.time() - CacheRegion.regions[region]['expires'] - 3600
 
     if args:
         try:
             cache_key = " ".join(map(str, args))
         except UnicodeEncodeError:
             cache_key = " ".join(map(str, args))
-        redis.hset('retools:%s:%s:%s' % (region, namespace, cache_key),
-                   'created', new_created)
+            
+        key = 'retools:%s:%s:%s' % (region, namespace, cache_key)
+        if new_created is not False:
+            redis.hset(key, 'created', new_created)
+        else:
+            redis.delete(key)
     else:
         cache_keyset_key = 'retools:%s:%s:keys' % (region, namespace)
         keys = {''} | redis.smembers(cache_keyset_key)
         p = redis.pipeline(transaction=True)
         for key in keys:
-            p.hset('retools:%s:%s:%s' % (region, namespace, key), 'created',
-                   new_created)
+            __key = 'retools:%s:%s:%s' % (region, namespace, key)
+            
+            if new_created is not False:
+                p.hset(__key, 'created', new_created)
+            else:
+                p.delete(__key)
+                
         p.execute()
     return None
 invalidate_function = invalidate_callable
