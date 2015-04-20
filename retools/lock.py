@@ -13,6 +13,7 @@ we shouldn't be deleting their lock.
 # Copyright 2010,2011 Chris Lamb <lamby@debian.org>
 
 import time
+import random
 
 from retools import global_connection
 
@@ -49,6 +50,7 @@ class Lock(object):
     def __enter__(self):
         redis = self.redis
         timeout = self.timeout
+        retry_sleep = 0.005
 
         if self.expires is None:
             return
@@ -72,7 +74,8 @@ class Lock(object):
 
             timeout -= 1
             if timeout >= 0:
-                time.sleep(1)
+                time.sleep(random.uniform(0, retry_sleep))
+                retry_sleep = min(retry_sleep * 2, 1)
         raise LockTimeout("Timeout while waiting for lock")
 
     def __exit__(self, exc_type, exc_value, traceback):
