@@ -1,4 +1,4 @@
-__version__ = '0.3-znanja1.0.4'
+__version__ = '0.3-znanja1.0.5'
 
 import os
 
