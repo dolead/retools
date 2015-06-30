@@ -1,4 +1,4 @@
-__version__ = '0.3-znanja1.0.5'
+__version__ = '0.5.0'
 
 import os
 
@@ -33,6 +33,6 @@ setup(name='retools',
       entry_points="""
       [console_scripts]
       retools-worker = retools.queue:run_worker
-      
+
       """
 )
