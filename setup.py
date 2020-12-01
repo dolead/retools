@@ -1,4 +1,4 @@
-__version__ = '0.5.0'
+__version__ = '0.5.2'
 
 import os
 
@@ -25,7 +25,7 @@ setup(name='retools',
       test_suite="retools.tests",
       include_package_data=True,
       zip_safe=False,
-      tests_require = ['pkginfo', 'Mock>=0.8rc2', 'nose'],
+      tests_require=['pkginfo', 'Mock>=0.8rc2', 'nose'],
       install_requires=[
           "setproctitle>=1.1.2",
           "redis>=2.7.3",
@@ -35,4 +35,4 @@ setup(name='retools',
       retools-worker = retools.queue:run_worker
 
       """
-)
+      )
