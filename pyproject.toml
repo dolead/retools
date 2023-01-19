@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "retools"
+version = "0.5.3"
+description = "Inter-realm utilitary libraries"
+authors = ["Ben Bangert <ben@groovie.org>",
+           "Engineering <it@dolead.com>"]
+readme = "README.rst"
+packages = [{include = "retools"}]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+setproctitle = ">=1.1.2"
+redis = ">=2.7.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
