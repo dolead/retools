@@ -7,8 +7,8 @@
     tracker <https://github.com/bbangert/retools/issues>`_.
 
 Any function that takes keyword arguments can be a ``job`` that a worker runs.
-The :class:`~retools.queue.QueueManager` handles configuration and enqueing jobs
-to be run.
+The :class:`~retools.queue.QueueManager` handles configuration and
+enqueing jobs to be run.
 
 Declaring jobs::
 
@@ -82,8 +82,8 @@ Running the Worker
 
 After installing ``retools``, a ``retools-worker`` command will be available
 that can spawn a worker. Queues to watch can be listed in order for priority
-queueing, in which case the worker will try each queue in order looking for jobs
-to process.
+queueing, in which case the worker will try each queue in order
+looking for jobs to process.
 
 Example invokation:
 
@@ -92,6 +92,8 @@ Example invokation:
     $ retools-worker high,medium,main
 
 """
+
+import json
 import os
 import signal
 import socket
@@ -100,14 +102,8 @@ import sys
 import time
 import uuid
 from datetime import datetime
-from optparse import OptionParser
-
 from importlib.metadata import EntryPoint
-
-try:
-    import json
-except ImportError:  # pragma: nocover
-    import simplejson as json
+from optparse import OptionParser
 
 from setproctitle import setproctitle
 
@@ -115,10 +111,14 @@ from retools import global_connection
 from retools.exc import ConfigurationError
 from retools.util import with_nested_contexts
 
+#: The job currently being run by this worker process
+current_job = None
 
-class QueueManager(object):
+
+class QueueManager:
     """Configures and enqueues jobs"""
-    def __init__(self, redis=None, default_queue_name='main'):
+
+    def __init__(self, redis=None, default_queue_name="main"):
         """Initialize a QueueManager
 
         :param redis: A Redis instance. Defaults to the redis instance
@@ -145,7 +145,7 @@ class QueueManager(object):
         if queue_name is None:
             queue_name = self.default_queue_name
 
-        full_queue_name = 'retools:queue:' + queue_name
+        full_queue_name = "retools:queue:" + queue_name
         current_len = self.redis.llen(full_queue_name)
 
         # that's O(n), we should do better
@@ -155,9 +155,9 @@ class QueueManager(object):
             job = self.redis.lindex(full_queue_name, i)
             job_data = json.loads(job)
 
-            if job_data['job_id'] == job_id:
+            if job_data["job_id"] == job_id:
                 if not full_job:
-                    return job_data['job_id']
+                    return job_data["job_id"]
 
                 return Job(full_queue_name, job, self.redis)
 
@@ -167,7 +167,7 @@ class QueueManager(object):
         if queue_name is None:
             queue_name = self.default_queue_name
 
-        full_queue_name = 'retools:queue:' + queue_name
+        full_queue_name = "retools:queue:" + queue_name
         current_len = self.redis.llen(full_queue_name)
 
         for i in range(current_len):
@@ -176,7 +176,7 @@ class QueueManager(object):
             job = self.redis.lindex(full_queue_name, i)
             if not full_job:
                 job_dict = json.loads(job)
-                yield job_dict['job_id']
+                yield job_dict["job_id"]
 
             yield Job(full_queue_name, job, self.redis)
 
@@ -205,19 +205,18 @@ class QueueManager(object):
 
         """
         if job not in self.names:
-            job_func = EntryPoint(
-                name='x', value=job, group='retools').load()
+            job_func = EntryPoint(name="x", value=job, group="retools").load()
             self.names[job] = job_func
 
-        queue_name = kwargs.pop('queue_name', None)
+        queue_name = kwargs.pop("queue_name", None)
         if not queue_name:
-            queue_name = self.job_config.get('job', self.default_queue_name)
+            queue_name = self.job_config.get("job", self.default_queue_name)
 
-        metadata = kwargs.pop('metadata', None)
+        metadata = kwargs.pop("metadata", None)
         if metadata is None:
             metadata = {}
 
-        full_queue_name = 'retools:queue:' + queue_name
+        full_queue_name = "retools:queue:" + queue_name
         job_id = uuid.uuid4().hex
         events = self.global_events.copy()
         if job in self.job_events:
@@ -225,21 +224,21 @@ class QueueManager(object):
                 events.setdefault(k, []).extend(v)
 
         job_dct = {
-            'job_id': job_id,
-            'job': job,
-            'kwargs': kwargs,
-            'events': events,
-            'metadata': metadata,
-            'state': {}
+            "job_id": job_id,
+            "job": job,
+            "kwargs": kwargs,
+            "events": events,
+            "metadata": metadata,
+            "state": {},
         }
         pipeline = self.redis.pipeline()
         pipeline.rpush(full_queue_name, json.dumps(job_dct))
-        pipeline.sadd('retools:queues', queue_name)
+        pipeline.sadd("retools:queues", queue_name)
         pipeline.execute()
         return job_id
 
 
-class Job(object):
+class Job:
     def __init__(self, queue_name, job_payload, redis):
         """Create a job instance given a JSON job payload
 
@@ -264,30 +263,33 @@ class Job(object):
         * **redis**: A :class:`redis.Redis` instance.
 
         """
-        global current_job
+        # the worker exposes the job it is running through this
+        global current_job  # pylint: disable=global-statement
         current_job = self
 
         self.payload = payload = json.loads(job_payload)
-        self.job_id = payload['job_id']
-        self.job_name = payload['job']
+        self.job_id = payload["job_id"]
+        self.job_name = payload["job"]
         self.queue_name = queue_name
-        self.kwargs = payload['kwargs']
-        self.state = payload['state']
-        self.metadata = payload.get('metadata', {})
+        self.kwargs = payload["kwargs"]
+        self.state = payload["state"]
+        self.metadata = payload.get("metadata", {})
         self.events = {}
         self.redis = redis
         self.func = None
-        self.events = self.load_events(event_dict=payload['events'])
+        self.events = self.load_events(event_dict=payload["events"])
 
     def __repr__(self):
         """Display representation of self"""
-        res = '<%s object at %s: ' % (self.__class__.__name__, hex(id(self)))
-        res += 'Events: %s, ' % self.events
-        res += 'State: %s, ' % self.state
-        res += 'Job ID: %s, ' % self.job_id
-        res += 'Job Name: %s, ' % self.job_name
-        res += 'Queue: %s' % self.queue_name
-        res += '>'
+        res = "<{} object at {}: ".format(
+            self.__class__.__name__, hex(id(self))
+        )
+        res += "Events: %s, " % self.events
+        res += "State: %s, " % self.state
+        res += "Job ID: %s, " % self.job_id
+        res += "Job Name: %s, " % self.job_name
+        res += "Queue: %s" % self.queue_name
+        res += ">"
         return res
 
     @staticmethod
@@ -302,7 +304,7 @@ class Job(object):
         for k, v in list(event_dict.items()):
             funcs = []
             for name in v:
-                mod_name, func_name = name.split(':')
+                mod_name, func_name = name.split(":")
                 try:
                     mod = sys.modules[mod_name]
                 except KeyError:
@@ -314,27 +316,29 @@ class Job(object):
 
     def perform(self):
         """Runs the job calling all the job signals as appropriate"""
-        self.run_event('job_prerun')
+        self.run_event("job_prerun")
         try:
-            if 'job_wrapper' in self.events:
-                result = with_nested_contexts(self.events['job_wrapper'],
-                                              self.func, [self], self.kwargs)
+            if "job_wrapper" in self.events:
+                result = with_nested_contexts(
+                    self.events["job_wrapper"], self.func, [self], self.kwargs
+                )
             else:
                 result = self.func(**self.kwargs)
-            self.run_event('job_postrun', result=result)
+            self.run_event("job_postrun", result=result)
             return True
         except Exception as exc:
-            self.run_event('job_failure', exc=exc)
+            self.run_event("job_failure", exc=exc)
             return False
 
     def to_dict(self):
         return {
-            'job_id': self.job_id,
-            'job': self.job_name,
-            'kwargs': self.kwargs,
-            'events': self.payload['events'],
-            'state': self.state,
-            'metadata': self.metadata}
+            "job_id": self.job_id,
+            "job": self.job_name,
+            "kwargs": self.kwargs,
+            "events": self.payload["events"],
+            "state": self.state,
+            "metadata": self.metadata,
+        }
 
     def to_json(self):
         return json.dumps(self.to_dict())
@@ -342,10 +346,10 @@ class Job(object):
     def enqueue(self):
         """Queue this job in Redis"""
         full_queue_name = self.queue_name
-        queue_name = full_queue_name.lstrip('retools:queue:')
+        queue_name = full_queue_name.lstrip("retools:queue:")
         pipeline = self.redis.pipeline()
         pipeline.rpush(full_queue_name, self.to_json())
-        pipeline.sadd('retools:queues', queue_name)
+        pipeline.sadd("retools:queues", queue_name)
         pipeline.execute()
         return self.job_id
 
@@ -355,8 +359,9 @@ class Job(object):
             event_func(job=self, **kwargs)
 
 
-class Worker(object):
+class Worker:
     """A Worker works on jobs"""
+
     def __init__(self, queues, redis=None):
         """Create a worker
 
@@ -372,8 +377,9 @@ class Worker(object):
         self.redis = redis or global_connection.redis
         if not queues:
             raise ConfigurationError(
-                  "No queues were configured for this worker")
-        self.queues = ['retools:queue:%s' % x for x in queues]
+                "No queues were configured for this worker"
+            )
+        self.queues = ["retools:queue:%s" % x for x in queues]
         self.paused = self.shutdown = False
         self.job = None
         self.child_id = None
@@ -382,13 +388,13 @@ class Worker(object):
     @classmethod
     def get_workers(cls, redis=None):
         redis = redis or global_connection.redis
-        for worker_id in redis.smembers('retools:workers'):
+        for worker_id in redis.smembers("retools:workers"):
             yield cls.from_id(worker_id)
 
     @classmethod
     def get_worker_ids(cls, redis=None):
         redis = redis or global_connection.redis
-        return redis.smembers('retools:workers')
+        return redis.smembers("retools:workers")
 
     @classmethod
     def from_id(cls, worker_id, redis=None):
@@ -396,19 +402,22 @@ class Worker(object):
         if not redis.sismember("retools:workers", worker_id):
             raise IndexError(worker_id)
         queues = redis.get("retools:worker:%s:queues" % worker_id)
-        queues = queues.split(',')
+        queues = queues.split(",")
         return Worker(queues, redis)
 
     @property
     def worker_id(self):
         """Returns this workers id based on hostname, pid, queues"""
-        return '%s:%s:%s' % (socket.gethostname(), os.getpid(),
-              self.queue_names)
+        return "{}:{}:{}".format(
+            socket.gethostname(),
+            os.getpid(),
+            self.queue_names,
+        )
 
     @property
     def queue_names(self):
-        names = [x.lstrip('retools:queue:') for x in self.queues]
-        return ','.join(names)
+        names = [x.lstrip("retools:queue:") for x in self.queues]
+        return ",".join(names)
 
     def work(self, interval=5, blocking=False):
         """Work on jobs
@@ -426,7 +435,7 @@ class Worker(object):
         :type blocking: bool
 
         """
-        self.set_proc_title('Starting')
+        self.set_proc_title("Starting")
         self.startup()
 
         try:
@@ -441,12 +450,17 @@ class Worker(object):
                     self.working_on()
                     self.child_id = os.fork()
                     if self.child_id:
-                        self.set_proc_title("Forked %s at %s" % (
-                            self.child_id, datetime.now()))
+                        self.set_proc_title(
+                            "Forked {} at {}".format(
+                                self.child_id, datetime.now()
+                            )
+                        )
                         os.wait()
                     else:
-                        self.set_proc_title("Processing %s since %s" % (
-                            self.job.queue_name, datetime.now()))
+                        self.set_proc_title(
+                            "Processing %s since %s"
+                            % (self.job.queue_name, datetime.now())
+                        )
                         self.perform()
                         sys.exit()
                     self.done_working()
@@ -457,7 +471,8 @@ class Worker(object):
                         self.set_proc_title("Paused")
                     elif not blocking:
                         self.set_proc_title(
-                              "Waiting for %s" % self.queue_names)
+                            "Waiting for %s" % self.queue_names
+                        )
                         time.sleep(interval)
         finally:
             self.unregister_worker()
@@ -478,12 +493,13 @@ class Worker(object):
         if not queue_name:
             return False
 
-        self.job = job = Job(queue_name=queue_name, job_payload=job_payload,
-                             redis=self.redis)
+        self.job = job = Job(
+            queue_name=queue_name, job_payload=job_payload, redis=self.redis
+        )
         try:
             job.func = self.jobs[job.job_name]
         except KeyError:
-            mod_name, func_name = job.job_name.split(':')
+            mod_name, func_name = job.job_name.split(":")
             __import__(mod_name)
             mod = sys.modules[mod_name]
             job.func = self.jobs[job.job_name] = getattr(mod, func_name)
@@ -491,15 +507,16 @@ class Worker(object):
 
     def set_proc_title(self, title):
         """Sets the active process title, retains the retools prefic"""
-        setproctitle('retools: ' + title)
+        setproctitle("retools: " + title)
 
     def register_worker(self):
         """Register this worker with Redis"""
         pipeline = self.redis.pipeline()
         pipeline.sadd("retools:workers", self.worker_id)
         pipeline.set("retools:worker:%s:started" % self.worker_id, time.time())
-        pipeline.set("retools:worker:%s:queues" % self.worker_id,
-                     self.queue_names)
+        pipeline.set(
+            "retools:worker:%s:queues" % self.worker_id, self.queue_names
+        )
         pipeline.execute()
 
     def unregister_worker(self, worker_id=None):
@@ -546,7 +563,7 @@ class Worker(object):
         known_workers = self.worker_pids()
         hostname = socket.gethostname()
         for worker in all_workers:
-            host, pid, queues = worker.split(':')
+            host, pid, _ = worker.split(":")
             if host != hostname or pid in known_workers:
                 continue
             self.unregister_worker(worker)
@@ -563,9 +580,9 @@ class Worker(object):
     def working_on(self):
         """Indicate with Redis what we're working on"""
         data = {
-            'queue': self.job.queue_name,
-            'run_at': time.time(),
-            'payload': self.job.payload
+            "queue": self.job.queue_name,
+            "run_at": time.time(),
+            "payload": self.job.payload,
         }
         self.redis.set("retools:worker:%s" % self.worker_id, json.dumps(data))
 
@@ -575,12 +592,15 @@ class Worker(object):
 
     def worker_pids(self):
         """Returns a list of all the worker processes"""
-        ps = subprocess.Popen("ps -U 0 -A | grep 'retools:'", shell=True,
-                              stdout=subprocess.PIPE)
-        data = ps.stdout.read()
-        ps.stdout.close()
-        ps.wait()
-        return [x.split()[0] for x in data.split('\n') if x]
+        with subprocess.Popen(
+            "ps -U 0 -A | grep 'retools:'",
+            shell=True,
+            stdout=subprocess.PIPE,
+        ) as ps:
+            data = ps.stdout.read()
+            ps.stdout.close()
+            ps.wait()
+        return [x.split()[0] for x in data.split("\n") if x]
 
     def perform(self):
         """Run the job and call the appropriate signal handlers"""
@@ -590,16 +610,25 @@ class Worker(object):
 def run_worker():
     usage = "usage: %prog queues"
     parser = OptionParser(usage=usage)
-    parser.add_option("--interval", dest="interval", type="int", default=5,
-                      help="Polling interval")
-    parser.add_option("-b", dest="blocking", action="store_true",
-                      default=False,
-                      help="Whether to use blocking queue semantics")
-    (options, args) = parser.parse_args()
+    parser.add_option(
+        "--interval",
+        dest="interval",
+        type="int",
+        default=5,
+        help="Polling interval",
+    )
+    parser.add_option(
+        "-b",
+        dest="blocking",
+        action="store_true",
+        default=False,
+        help="Whether to use blocking queue semantics",
+    )
+    options, args = parser.parse_args()
 
     if len(args) < 1:
         sys.exit("Error: Failed to provide queues or packages_to_scan args")
 
-    worker = Worker(queues=args[0].split(','))
+    worker = Worker(queues=args[0].split(","))
     worker.work(interval=options.interval, blocking=options.blocking)
     sys.exit()

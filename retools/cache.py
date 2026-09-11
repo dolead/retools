@@ -19,31 +19,33 @@ object::
     CacheRegion.add_region("short_term", expires=60)
 
 """
+
 import pickle
 import time
 from datetime import date
+from functools import wraps
 
 from retools import global_connection
 from retools.exc import CacheConfigurationError
-from retools.lock import Lock
-from retools.lock import LockTimeout
-from retools.util import func_namespace
-from retools.util import has_self_arg
+from retools.lock import Lock, LockTimeout
+from retools.util import func_namespace, has_self_arg
 
-from functools import wraps
 
-class _NoneMarker(object):
+class _NoneMarker:
     pass
+
+
 NoneMarker = _NoneMarker()
 
 
-class CacheKey(object):
+class CacheKey:
     """Cache Key object
 
     Generator of cache keys for a variety of purposes once
     provided with a region, namespace, and key (args).
 
     """
+
     def __init__(self, region, namespace, key, today=None):
         """Setup a CacheKey object
 
@@ -60,16 +62,24 @@ class CacheKey(object):
         """
         if not today:
             today = str(date.today())
-        self.lock_key = 'retools:lock:%s:%s:%s' % (region, namespace, key)
-        self.redis_key = 'retools:%s:%s:%s' % (region, namespace, key)
-        self.redis_hit_key = 'retools:hits:%s:%s:%s:%s' % (
-            today, region, namespace, key)
-        self.redis_miss_key = 'retools:misses:%s:%s:%s:%s' % (
-            today, region, namespace, key)
-        self.redis_keyset = 'retools:%s:%s:keys' % (region, namespace)
+        self.lock_key = "retools:lock:{}:{}:{}".format(region, namespace, key)
+        self.redis_key = "retools:{}:{}:{}".format(region, namespace, key)
+        self.redis_hit_key = "retools:hits:{}:{}:{}:{}".format(
+            today,
+            region,
+            namespace,
+            key,
+        )
+        self.redis_miss_key = "retools:misses:{}:{}:{}:{}".format(
+            today,
+            region,
+            namespace,
+            key,
+        )
+        self.redis_keyset = "retools:{}:{}:keys".format(region, namespace)
 
 
-class CacheRegion(object):
+class CacheRegion:
     """CacheRegion manager and configuration object
 
     For organization sake, the CacheRegion object is used to configure
@@ -88,7 +98,8 @@ class CacheRegion(object):
     then this should be used directly.
 
     """
-    regions = {}
+
+    regions: dict = {}
     enabled = True
     statistics = True
 
@@ -105,8 +116,10 @@ class CacheRegion(object):
         :type redis_expiration: integer
 
         """
-        cls.regions[name] = dict(expires=expires,
-                                 redis_expiration=redis_expiration)
+        cls.regions[name] = {
+            "expires": expires,
+            "redis_expiration": redis_expiration,
+        }
 
     @classmethod
     def _add_tracking(cls, pipeline, region, namespace, key):
@@ -116,9 +129,9 @@ class CacheRegion(object):
         Redis.
 
         """
-        pipeline.sadd('retools:regions', region)
-        pipeline.sadd('retools:%s:namespaces' % region, namespace)
-        pipeline.sadd('retools:%s:%s:keys' % (region, namespace), key)
+        pipeline.sadd("retools:regions", region)
+        pipeline.sadd("retools:%s:namespaces" % region, namespace)
+        pipeline.sadd("retools:{}:{}:keys".format(region, namespace), key)
 
     @classmethod
     def invalidate(cls, region):
@@ -134,7 +147,10 @@ class CacheRegion(object):
 
         """
         redis = global_connection.redis
-        namespaces = {ns.decode('utf8') for ns in redis.smembers('retools:%s:namespaces' % region)}
+        namespaces = {
+            ns.decode("utf8")
+            for ns in redis.smembers("retools:%s:namespaces" % region)
+        }
         if not namespaces:
             return None
 
@@ -142,28 +158,37 @@ class CacheRegion(object):
         # the created value far enough back to force a refresh
         try:
             longest_expire = max(
-                  [x['expires'] for x in list(CacheRegion.regions.values())])
+                x["expires"] for x in CacheRegion.regions.values()
+            )
             new_created = time.time() - longest_expire - 3600
         except TypeError:
             new_created = False
 
         for ns in namespaces:
-            cache_keyset_key = 'retools:%s:%s:keys' % (region, ns)
-            keys = {''} | {_k.decode('utf8') for _k in redis.smembers(cache_keyset_key)}
+            cache_keyset_key = "retools:{}:{}:keys".format(region, ns)
+            keys = {""} | {
+                _k.decode("utf8") for _k in redis.smembers(cache_keyset_key)
+            }
             for key in keys:
-                cache_key = 'retools:%s:%s:%s' % (region, ns, key)
+                cache_key = "retools:{}:{}:{}".format(region, ns, key)
                 if not redis.exists(cache_key):
                     redis.srem(cache_keyset_key, key)
                 else:
                     if new_created is not False:
-                        redis.hset(cache_key, 'created', new_created)
+                        redis.hset(cache_key, "created", new_created)
                     else:
                         redis.delete(cache_key)
-            
 
     @classmethod
-    def load(cls, region, namespace, key, regenerate=True, callable=None,
-             statistics=None):
+    def load(
+        cls,
+        region,
+        namespace,
+        key,
+        regenerate=True,
+        callable=None,
+        statistics=None,
+    ):
         """Load a value from Redis, and possibly recreate it
 
         This method is used to load a value from Redis, and usually
@@ -196,8 +221,8 @@ class CacheRegion(object):
         redis = global_connection.redis
         now = time.time()
         region_settings = cls.regions[region]
-        expires = region_settings['expires']
-        redis_expiration = region_settings['redis_expiration']
+        expires = region_settings["expires"]
+        redis_expiration = region_settings["redis_expiration"]
 
         keys = CacheKey(region=region, namespace=namespace, key=key)
 
@@ -218,7 +243,9 @@ class CacheRegion(object):
             result = redis.hgetall(keys.redis_key)
 
         expired = True
-        if expires is None or (result and now - float(result[b'created']) < expires):
+        if expires is None or (
+            result and now - float(result[b"created"]) < expires
+        ):
             expired = False
 
         if (result and not regenerate) or not expired:
@@ -226,7 +253,7 @@ class CacheRegion(object):
             # we always return it immediately regardless of expiration,
             # or its not expired
             try:
-                result = pickle.loads(result[b'value'])
+                result = pickle.loads(result[b"value"])
             except KeyError:
                 pass
             else:
@@ -238,25 +265,31 @@ class CacheRegion(object):
             return NoneMarker
 
         # Don't wait for the lock if we have an old value
-        if result and 'value' in result:
+        if result and "value" in result:
             timeout = 0
         else:
             timeout = 60 * 60
 
+        new_hits = existing_hits
         try:
             with Lock(keys.lock_key, expires=expires, timeout=timeout):
                 # Did someone else already create it?
                 result = redis.hgetall(keys.redis_key)
                 now = time.time()
-                if result and 'value' in result and \
-                   now - float(result[b'created']) < expires:
-                    return pickle.loads(result[b'value'])
+                if (
+                    result
+                    and "value" in result
+                    and now - float(result[b"created"]) < expires
+                ):
+                    return pickle.loads(result[b"value"])
 
                 value = callable()
 
                 p = redis.pipeline(transaction=True)
-                p.hmset(keys.redis_key, {'created': now,
-                                    'value': pickle.dumps(value)})
+                p.hmset(
+                    keys.redis_key,
+                    {"created": now, "value": pickle.dumps(value)},
+                )
 
                 p.expire(keys.redis_key, redis_expiration)
                 cls._add_tracking(p, region, namespace, key)
@@ -267,10 +300,9 @@ class CacheRegion(object):
                     p.execute()
         except LockTimeout:
             if result:
-                return pickle.loads(result[b'value'])
-            else:
-                # log some sort of error?
-                return NoneMarker
+                return pickle.loads(result[b"value"])
+            # log some sort of error?
+            return NoneMarker
 
         # Nothing else to do if not recording stats
         if not statistics:
@@ -301,8 +333,9 @@ def invalidate_region(region):
     """
     CacheRegion.invalidate(region)
 
+
 def invalidate_callable(callable, *args):
-    """Invalidate the cache for a callable
+    r"""Invalidate the cache for a callable
 
     :param callable: The callable that was cached
     :type callable: callable object
@@ -336,41 +369,44 @@ def invalidate_callable(callable, *args):
     namespace = callable._namespace
 
     # Get the expiration for this region
-    if CacheRegion.regions[region]['expires'] is None:
+    if CacheRegion.regions[region]["expires"] is None:
         new_created = False
     else:
-        new_created = time.time() - CacheRegion.regions[region]['expires'] - 3600
+        new_created = (
+            time.time() - CacheRegion.regions[region]["expires"] - 3600
+        )
 
     if args:
         try:
             cache_key = " ".join(map(str, args))
         except UnicodeEncodeError:
             cache_key = " ".join(map(str, args))
-            
-        key = 'retools:%s:%s:%s' % (region, namespace, cache_key)
+
+        key = "retools:{}:{}:{}".format(region, namespace, cache_key)
         if new_created is not False:
-            redis.hset(key, 'created', new_created)
+            redis.hset(key, "created", new_created)
         else:
             redis.delete(key)
     else:
-        cache_keyset_key = 'retools:%s:%s:keys' % (region, namespace)
-        keys = {''} | redis.smembers(cache_keyset_key)
+        cache_keyset_key = "retools:{}:{}:keys".format(region, namespace)
+        keys = {""} | redis.smembers(cache_keyset_key)
         p = redis.pipeline(transaction=True)
         for key in keys:
-            __key = 'retools:%s:%s:%s' % (region, namespace, key)
-            
+            __key = "retools:{}:{}:{}".format(region, namespace, key)
+
             if new_created is not False:
-                p.hset(__key, 'created', new_created)
+                p.hset(__key, "created", new_created)
             else:
                 p.delete(__key)
-                
+
         p.execute()
-    return None
+
+
 invalidate_function = invalidate_callable
 
 
 def cache_region(region, *deco_args, **kwargs):
-    """Decorate a function such that its return result is cached,
+    r"""Decorate a function such that its return result is cached,
     using a "region" to indicate the cache arguments.
 
     :param region: Name of the region to cache to
@@ -429,16 +465,18 @@ def cache_region(region, *deco_args, **kwargs):
         not included in the "key" used for caching.
 
     """
+
     def decorate(func):
         namespace = func_namespace(func, deco_args)
         skip_self = has_self_arg(func)
-        regenerate = kwargs.get('regenerate', True)
+        regenerate = kwargs.get("regenerate", True)
 
         @wraps(func)
         def cached(*args):
             if region not in CacheRegion.regions:
                 raise CacheConfigurationError(
-                    'Cache region not configured: %s' % region)
+                    "Cache region not configured: %s" % region
+                )
             if not CacheRegion.enabled:
                 return func(*args)
 
@@ -455,9 +493,17 @@ def cache_region(region, *deco_args, **kwargs):
 
             def go():
                 return func(*args)
-            return CacheRegion.load(region, namespace, cache_key,
-                                    regenerate=regenerate, callable=go)
+
+            return CacheRegion.load(
+                region,
+                namespace,
+                cache_key,
+                regenerate=regenerate,
+                callable=go,
+            )
+
         cached._region = region
         cached._namespace = namespace
         return cached
+
     return decorate

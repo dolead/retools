@@ -15,7 +15,12 @@ CODE = $(wildcard retools/*.py)
 
 # Linter flags — these relax rules but never skip a linter.
 PYCODESTYLE_IGNORE = E126,E127,E128,W503
-PYLINT_DISABLE     = I0011,R0901,R0902,R0801,C0111,C0103,C0411,C0415,R0903,R0913,R0914,R0917,R0915,R1710,W0613,W0703
+# Beyond the set shared with the other libraries, this legacy package
+# relaxes: C0209 (38 %-format sites, cosmetic), W0622 (`callable` is a
+# published parameter name), W0212 (the cache decorator reads the
+# attributes it set itself), and R0904/R0911/R0912 (complexity, like
+# the R0913/R0914/R0915 already in the shared set).
+PYLINT_DISABLE     = I0011,R0901,R0902,R0801,C0111,C0103,C0411,C0415,R0903,R0913,R0914,R0917,R0915,R1710,W0613,W0703,C0209,W0622,W0212,R0904,R0911,R0912
 
 # Git tag prefix for `make release`: set to `v` for vX.Y.Z tags,
 # leave empty for plain X.Y.Z tags.

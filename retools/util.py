@@ -1,25 +1,25 @@
 """Utility functions"""
+
 import inspect
 
 
 def func_namespace(func, deco_args):
     """Generates a unique namespace for a function"""
     kls = None
-    if hasattr(func, 'im_func'):
+    if hasattr(func, "im_func"):
         kls = func.__self__.__class__
         func = func.__func__
 
     deco_key = " ".join(map(str, deco_args))
     if kls:
-        return '%s.%s.%s' % (kls.__module__, kls.__name__, deco_key)
-    else:
-        return '%s.%s.%s' % (func.__module__, func.__name__, deco_key)
+        return f"{kls.__module__}.{kls.__name__}.{deco_key}"
+    return f"{func.__module__}.{func.__name__}.{deco_key}"
 
 
 def has_self_arg(func):
     """Return True if the given function has a 'self' argument."""
-    return inspect.getargspec(func)[0] and \
-          inspect.getargspec(func)[0][0] in ('self', 'cls')
+    args = inspect.getfullargspec(func)[0]
+    return bool(args) and args[0] in ("self", "cls")
 
 
 def with_nested_contexts(context_managers, func, args, kwargs):
@@ -45,8 +45,6 @@ def with_nested_contexts(context_managers, func, args, kwargs):
     """
     if not context_managers:
         return func(**kwargs)
-    else:
-        ctx_manager = context_managers[0]
-        with ctx_manager(func, *args, **kwargs):
-            return with_nested_contexts(context_managers[1:],
-                  func, args, kwargs)
+    ctx_manager = context_managers[0]
+    with ctx_manager(func, *args, **kwargs):
+        return with_nested_contexts(context_managers[1:], func, args, kwargs)

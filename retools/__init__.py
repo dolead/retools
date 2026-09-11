@@ -12,12 +12,13 @@ Alternatively, many parts of retools accept Redis instances that may be passed
 directly.
 
 """
+
 from redis import Redis
 
-__all__ = ['Connection']
+__all__ = ["Connection"]
 
 
-class Connection(object):
+class Connection:
     """The default Redis Connection
 
     A :obj:`retools.global_connection` object is created using this
@@ -26,6 +27,7 @@ class Connection(object):
     functions can be called with a custom ``Redis`` object.
 
     """
+
     def __init__(self):
         self._redis = None
 
@@ -38,5 +40,6 @@ class Connection(object):
     @redis.setter
     def redis(self, conn):
         self._redis = conn
+
 
 global_connection = Connection()

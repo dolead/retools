@@ -10,15 +10,16 @@ lock stored here is actually from a *different* client holding a lock and
 we shouldn't be deleting their lock.
 
 """
+
 # Copyright 2010,2011 Chris Lamb <lamby@debian.org>
 
-import time
 import random
+import time
 
 from retools import global_connection
 
 
-class Lock(object):
+class Lock:
     def __init__(self, key, expires=60, timeout=10, redis=None):
         """
         Distributed locking using Redis SETNX and GETSET.
@@ -66,8 +67,11 @@ class Lock(object):
             current_value = redis.get(self.key)
 
             # We found an expired lock and nobody raced us to replacing it
-            if current_value and float(current_value) < time.time() and \
-               redis.getset(self.key, expires) == current_value:
+            if (
+                current_value
+                and float(current_value) < time.time()
+                and redis.getset(self.key, expires) == current_value
+            ):
                 self.start_time = time.time()
                 redis.expire(self.key, int(self.expires))
                 return
