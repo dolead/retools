@@ -91,5 +91,10 @@ class Lock:
             self.redis.delete(self.key)
 
 
-class LockTimeout(BaseException):
-    """Raised in the event a timeout occurs while waiting for a lock"""
+class LockTimeout(Exception):
+    """Raised in the event a timeout occurs while waiting for a lock
+
+    Inherits Exception, not BaseException: waiting too long for a
+    lock is an ordinary failure, and a caller that wraps its
+    critical section in `except Exception` must be able to catch it.
+    """

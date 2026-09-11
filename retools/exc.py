@@ -1,8 +1,14 @@
 """retools exceptions"""
 
 
-class RetoolsException(BaseException):
-    """retools package base exception"""
+class RetoolsException(Exception):
+    """retools package base exception
+
+    Inherits Exception, not BaseException: these are ordinary
+    failures callers are meant to catch. Deriving them from
+    BaseException made them slip through every `except Exception`
+    in their path, taking the process down instead of the call.
+    """
 
 
 class ConfigurationError(RetoolsException):
