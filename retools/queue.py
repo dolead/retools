@@ -401,7 +401,9 @@ class Worker:
         redis = redis or global_connection.redis
         if not redis.sismember("retools:workers", worker_id):
             raise IndexError(worker_id)
-        queues = redis.get("retools:worker:%s:queues" % worker_id)
+        queues = redis.get(f"retools:worker:{worker_id}:queues")
+        if isinstance(queues, bytes):
+            queues = queues.decode("utf8")
         queues = queues.split(",")
         return Worker(queues, redis)
 

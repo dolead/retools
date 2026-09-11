@@ -6,13 +6,20 @@ import inspect
 def func_namespace(func, deco_args):
     """Generates a unique namespace for a function"""
     kls = None
-    if hasattr(func, "im_func"):
-        kls = func.__self__.__class__
+    if inspect.ismethod(func):
+        owner = func.__self__
+        kls = owner if isinstance(owner, type) else type(owner)
         func = func.__func__
 
     deco_key = " ".join(map(str, deco_args))
     if kls:
         return f"{kls.__module__}.{kls.__name__}.{deco_key}"
+    # python 3 hands out plain functions for undecorated methods, so
+    # the owning class only survives in __qualname__
+    qualname = getattr(func, "__qualname__", "")
+    if "." in qualname and has_self_arg(func):
+        kls_name = qualname.rsplit(".", 1)[0]
+        return f"{func.__module__}.{kls_name}.{deco_key}"
     return f"{func.__module__}.{func.__name__}.{deco_key}"
 
 

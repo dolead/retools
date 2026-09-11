@@ -241,6 +241,7 @@ class CacheRegion:
                 existing_hits = int(existing_hits)
         else:
             result = redis.hgetall(keys.redis_key)
+            existing_hits = 0
 
         expired = True
         if expires is None or (
@@ -265,7 +266,7 @@ class CacheRegion:
             return NoneMarker
 
         # Don't wait for the lock if we have an old value
-        if result and "value" in result:
+        if result and b"value" in result:
             timeout = 0
         else:
             timeout = 60 * 60
@@ -278,7 +279,7 @@ class CacheRegion:
                 now = time.time()
                 if (
                     result
-                    and "value" in result
+                    and b"value" in result
                     and now - float(result[b"created"]) < expires
                 ):
                     return pickle.loads(result[b"value"])
