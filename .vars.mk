@@ -5,10 +5,10 @@
 # Source code path(s) for style linters (isort, black, flake8,
 # pycodestyle, pylint). A directory (mypackage/), several paths
 # (mypackage tests) or a single file (mymodule.py).
-CODE = $(wildcard retools/*.py)
+CODE = retools
 
 # Path(s) for type checking with mypy. Defaults to CODE if unset.
-# TYPE_CODE = retools
+TYPE_CODE = $(wildcard retools/*.py)
 
 # Test command. Defaults to `poetry run pytest` if unset.
 # TEST_CMD = poetry run pytest tests/
