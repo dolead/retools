@@ -1,6 +1,6 @@
 [project]
 name = "retools"
-version = "0.5.3"
+version = "0.5.4"
 description = "Inter-realm utilitary libraries"
 authors = [
     {name = "Ben Bangert", email = "ben@groovie.org"},
