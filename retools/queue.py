@@ -102,7 +102,7 @@ import uuid
 from datetime import datetime
 from optparse import OptionParser
 
-import pkg_resources
+from importlib.metadata import EntryPoint
 
 try:
     import json
@@ -205,7 +205,8 @@ class QueueManager(object):
 
         """
         if job not in self.names:
-            job_func = pkg_resources.EntryPoint.parse('x=%s' % job).load(False)
+            job_func = EntryPoint(
+                name='x', value=job, group='retools').load()
             self.names[job] = job_func
 
         queue_name = kwargs.pop('queue_name', None)

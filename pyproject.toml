@@ -1,17 +1,53 @@
-[tool.poetry]
+[project]
 name = "retools"
 version = "0.5.3"
 description = "Inter-realm utilitary libraries"
-authors = ["Ben Bangert <ben@groovie.org>",
-           "Engineering <it@dolead.com>"]
+authors = [
+    {name = "Ben Bangert", email = "ben@groovie.org"},
+    {name = "Engineering", email = "it@dolead.com"},
+]
+license = "MIT"
 readme = "README.rst"
+keywords = ["cache", "redis", "queue", "lock"]
+requires-python = ">=3.9"
+dependencies = ["setproctitle>=1.1.2", "redis>=2.7.3"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+]
+
+[project.urls]
+Homepage = "https://github.com/dolead/retools"
+
+[project.scripts]
+retools-worker = "retools.queue:run_worker"
+
+[tool.poetry]
 packages = [{include = "retools"}]
 
 [tool.poetry.dependencies]
-python = "^3.7"
-setproctitle = ">=1.1.2"
-redis = ">=2.7.3"
+python = "^3.9"
+
+[tool.poetry.group.dev.dependencies]
+pytest = {version = ">=8.0,<9", python = ">=3.10"}
+isort = {version = "^6.0", python = ">=3.10"}
+pycodestyle = "^2.14.0"
+black = {version = "^26.3.1", python = ">=3.10"}
+flake8 = "^7.3.0"
+pylint = {version = "^4.0.5", python = ">=3.10"}
+mypy = "^1.19.1"
+
+[tool.pytest.ini_options]
+testpaths = ["retools/tests"]
+
+[tool.black]
+line-length = 79
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"
+line_length = 79
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
